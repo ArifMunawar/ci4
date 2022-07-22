@@ -1,0 +1,99 @@
+Komentar
+1.Buka app/Config/Routes.php, tambahkan route untuk komentar dibawah route transaksi
+// We get a performance increase by specifying the default
+// route since we don't have to scan directories.
+$routes->get('/', 'Home::index');
+$routes->get('login', 'Auth::login');
+$routes->add('login', 'Auth::login');
+$routes->get('register', 'Auth::register');
+$routes->add('register', 'Auth::register');
+$routes->get('logout', 'Auth::logout');
+$routes->get('shop', 'Shop::index');
+$routes->get('shop/category/(:segment)', 'Shop::category/$1');
+$routes->get('shop/product/(:segment)', 'Shop::product/$1');
+$routes->get('shop/getcity', 'Shop::getcity');
+$routes->get('shop/getcost', 'Shop::getcost');
+$routes->get('transaction', 'Transaksi::index', ['filter' => 'auth']);
+$routes->get('invoice/(:segment)', 'Transaksi::invoice', ['filter' => 'auth']);
+$routes->add('buy', 'Transaksi::buy', ['filter' => 'auth']);
+$routes->add('komentar/create', 'Komentar::create');
+
+2.Pada folder app/Models buat file baru bernama KomentarModel.php
+<?php namespace App\Models;
+
+use CodeIgniter\Model;
+
+class KomentarModel extends Model
+{
+	protected $table = 'komentar';
+	protected $primaryKey = 'id';
+	protected $allowedFields = [
+		'id_barang', 'id_user', 'komentar', 'created_date','created_by','updated_date','updated_by'
+	];
+	protected $returnType = 'App\Entities\Komentar';
+	protected $useTimestamps = false;
+}
+
+3.Didalam folder app/Entities. Tambahkan file baru "Komentar.php"
+<?php namespace App\Entities;
+
+use CodeIgniter\Entity;
+
+class Komentar extends Entity
+{ 
+
+}
+
+4.Buka app/Config/Validation.php, tambahkan rules untuk input komentar dibawah rules transaksi
+public $komentar = [
+		'komentar' =>[
+			'rules' => 'required',
+		],
+	];
+
+5.Buka folder app/Controller buat file baru bernama "Komentar.php"
+<?php
+namespace App\Controllers;
+
+class Komentar extends BaseController
+{
+	public function __construct()
+	{
+		helper('form');
+		$this->validation = \Config\Services::validation();
+		$this->session = session();
+    }
+
+    public function create(){ 
+        $model = new \App\Models\KomentarModel(); 
+
+        if($this->request->getPost())
+        {
+            $data = $this->request->getPost();
+            $this->validation->run($data, 'komentar');
+            $errors = $this->validation->getErrors();
+
+            if(!$errors)
+            {
+                $komentarEntity = new \App\Entities\Komentar();
+
+                $komentarEntity->fill($data);
+                $komentarEntity->id_user = $this->session->get('id');
+                $komentarEntity->created_by = $this->session->get('id');
+                $komentarEntity->created_date = date("Y-m-d H:i:s");
+
+                $model->save($komentarEntity);
+
+                $segments = ['shop','product', $this->request->getPost('id_barang')];
+
+                return redirect()->to(site_url($segments));
+            }
+        } 
+    }
+
+}
+Data dari form komentar yang ada pada menu transaction akan diterima oleh fungsi "create" yang ada pada controller Komentar.
+
+Hasilnya akan tampil di bagian bawah pada menu product detail sesuai yang diberi komentarnya
+
+Table komentar di database akan terisi dengan data komentar

@@ -1,0 +1,344 @@
+Transaksi
+1.Buka app/Config/Routes.php, tambahkan route untuk transaksi dibawah route shop
+// We get a performance increase by specifying the default
+// route since we don't have to scan directories.
+$routes->get('/', 'Home::index');
+$routes->get('login', 'Auth::login');
+$routes->add('login', 'Auth::login');
+$routes->get('register', 'Auth::register');
+$routes->add('register', 'Auth::register');
+$routes->get('logout', 'Auth::logout');
+$routes->get('shop', 'Shop::index');
+$routes->get('shop/category/(:segment)', 'Shop::category/$1');
+$routes->get('shop/product/(:segment)', 'Shop::product/$1');
+$routes->get('shop/getcity', 'Shop::getcity');
+$routes->get('shop/getcost', 'Shop::getcost');
+$routes->get('transaction', 'Transaksi::index', ['filter' => 'auth']);
+$routes->get('invoice/(:segment)', 'Transaksi::invoice', ['filter' => 'auth']);
+$routes->add('buy', 'Transaksi::buy', ['filter' => 'auth']);
+
+2.Pada folder app/Filters buat file baru bernama Auth.php
+<?php namespace App\Filters;
+
+use CodeIgniter\HTTP\RequestInterface;
+use CodeIgniter\HTTP\ResponseInterface;
+use CodeIgniter\Filters\FilterInterface;
+
+class Auth implements FilterInterface
+{
+    public function before(RequestInterface $request, $arguments = null)
+    {
+        // Do something here
+        if(!session()->has('isLoggedIn'))
+        {
+        	return redirect()->to(site_url('login'));
+        }
+    }
+
+    //--------------------------------------------------------------------
+
+    public function after(RequestInterface $request, ResponseInterface $response, $arguments = null)
+    {
+        // Do something here
+    }
+}
+
+3/Buka app/Config/Filters.php, pada variable $aliases tambahkan filter untuk "auth", sehingga menjadi
+public $aliases = [
+        'csrf'          => CSRF::class,
+        'toolbar'       => DebugToolbar::class,
+        'honeypot'      => Honeypot::class,
+        'invalidchars'  => InvalidChars::class,
+        'secureheaders' => SecureHeaders::class,
+        'auth' => \App\Filters\Auth::class
+    ];
+
+4.Pada folder app/Models buat file baru bernama TransaksiModel.php
+<?php namespace App\Models;
+
+use CodeIgniter\Model;
+
+class TransaksiModel extends Model
+{
+	protected $table = 'transaksi';
+	protected $primaryKey = 'id';
+	protected $allowedFields = [
+		'id_barang', 'id_pembeli', 'jumlah', 'total_harga', 'alamat', 'ongkir', 'status','created_date','created_by','updated_date','updated_by'
+	];
+	protected $returnType = 'App\Entities\Transaksi';
+	protected $useTimestamps = false;
+}
+
+5.Didalam folder app/Entities. Tambahkan file baru "Transaksi.php"
+<?php namespace App\Entities;
+
+use CodeIgniter\Entity;
+
+class Transaksi extends Entity
+{ 
+
+}
+
+6.Buka app/Config/Validation.php, tambahkan rules untuk input transaksi dibawah rules register dan login
+public $transaksi = [
+		'id_barang' => [
+			'rules' => 'required',
+		],
+		'id_pembeli' => [
+			'rules' => 'required',
+		],
+		'jumlah'=> [
+			'rules' => 'required',
+		],
+		'total_harga'=> [
+			'rules' => 'required',
+		],
+		'alamat'=> [
+			'rules' => 'required',
+		],
+		'ongkir'=> [
+			'rules' => 'required',
+		]
+	];
+
+7. Buka folder app/Controller buat file baru bernama "Transaksi.php"
+<?php
+
+namespace App\Controllers;
+use Dompdf\Dompdf;
+
+class Transaksi extends BaseController
+{ 
+    public function __construct()
+	{ 
+        helper('form');
+		$this->validation = \Config\Services::validation();
+		$this->session = session();
+	}
+
+    public function index()
+	{
+		$id = $this->session->get('id');
+		$transaksiModel = new \App\Models\TransaksiModel();  
+		$transaksi = $transaksiModel->where('id_pembeli', $id)->findAll();  
+		return view('transaksi/index',[
+			'transaksis' => $transaksi,  
+		]);
+	}
+
+    public function buy()
+    { 
+        if($this->request->getPost())
+		{
+			$data = $this->request->getPost();
+			$this->validation->run($data, 'transaksi');
+			$errors = $this->validation->getErrors();
+
+			if(!$errors){
+				$transaksiModel = new \App\Models\TransaksiModel();
+				$transaksi = new \App\Entities\Transaksi();
+
+				$barangModel = new \App\Models\BarangModel();
+				$id_barang = $this->request->getPost('id_barang');
+				$jumlah_pembelian = $this->request->getPost('jumlah');
+
+				$barang = $barangModel->find($id_barang);
+				$entityBarang = new \App\Entities\Barang();
+				
+				$entityBarang->id = $id_barang;
+
+				$entityBarang->stok = $barang->stok-$jumlah_pembelian;
+				$barangModel->save($entityBarang);
+
+				$transaksi->fill($data);
+				$transaksi->status = 0;
+				$transaksi->created_by = $this->session->get('id');
+				$transaksi->created_date = date("Y-m-d H:i:s");
+
+				$transaksiModel->save($transaksi);
+
+				$id = $transaksiModel->insertID(); 
+
+				return redirect()->to('transaction');
+			}
+		}
+    }
+ 
+    public function invoice(){
+		$id = $this->request->uri->getSegment(2);
+
+		$transaksiModel = new \App\Models\TransaksiModel();
+		$transaksi = $transaksiModel->find($id);
+
+		$userModel = new \App\Models\UserModel();
+		$pembeli = $userModel->find($transaksi->id_pembeli);
+
+		$barangModel = new \App\Models\BarangModel();
+		$barang = $barangModel->find($transaksi->id_barang);
+
+		$html = view('transaksi/invoice',[
+			'transaksi'=> $transaksi,
+			'pembeli' => $pembeli,
+			'barang' => $barang,
+		]); 
+ 
+        $filename = date('y-m-d-H-i-s'). '-invoice';
+
+        // instantiate and use the dompdf class
+        $dompdf = new Dompdf();
+
+        // load HTML content
+        $dompdf->loadHtml($html);
+
+        // (optional) setup the paper size and orientation
+        $dompdf->setPaper('A4', 'potrait');
+
+        // render html as PDF
+        $dompdf->render();
+
+        // output the generated pdf
+        $dompdf->stream($filename); 
+    }
+}
+
+Jika form pembelian diisi akan mengarah ke fungsi "buy" yang ada di controller transaksi
+
+Table transaksi di database akan terisi data pembelian
+
+8. Install dompdf untuk menampilkan pdf invoice.
+Caranya jalankan di terminal composer require dompdf/dompdf. Maka akan muncul folder dompdf di dalam folder vendor
+
+Cara kedua
+9.Buat folder baru dengan nama "transaksi" didalam folder Views. Lalu didalam folder shop tersebut buat file baru bernama "index.php" dan "invoice.php"
+File index.php mengacu pada tampilan file faq.html pada template
+<?= $this->extend('layout') ?>
+<?= $this->section('content') ?>
+<?php $session = session(); ?>
+    <!-- Breadcrumb Section Begin -->
+    <div class="breacrumb-section">
+        <div class="container">
+            <div class="row">
+                <div class="col-lg-12">
+                    <div class="breadcrumb-text">
+                        <a href="#"><i class="fa fa-home"></i> Home</a>
+                        <span>History</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Breadcrumb Section Begin -->
+    <!-- Faq Section Begin -->
+    <div class="faq-section spad"> 
+        <div class="container"> 
+            <div class="row"> 
+                <div class="col-lg-12"> 
+                    <div class="faq-accordin">
+                        <div class="accordion" id="accordionExample">
+                            <div class="card">
+                                <div class="card-heading active">
+                                    <a class="active" data-toggle="collapse" data-target="#collapseOne">
+                                        Leave a Comment
+                                    </a>
+                                </div>
+                                <div id="collapseOne" class="collapse show" data-parent="#accordionExample">
+                                    <div class="card-body">
+                                        <div class="col-lg-6 offset-lg-1">
+                                            <div class="contact-form">
+                                                <div class="leave-comment"> 
+                                                    <p>Give me your opinion about our product.</p>
+                                                    <form action="komentar/create" class="comment-form" method="POST">
+                                                        <div class="row">
+                                                            <div class="col-lg-12">
+                                                                <select name="id_barang" class="sorting">
+                                                                <?php foreach($transaksis as $index=>$transaksi): ?>
+                                                                <option value="<?= $transaksi->id_barang ?>">Transaction <?= $transaksi->created_date ?></option>
+                                                                <?php endforeach ?>
+                                                                </select>
+                                                            </div> 
+                                                            <div class="col-lg-12">
+                                                                <textarea placeholder="Your message" name="komentar"></textarea>
+                                                                <input type="submit" class="site-btn" value="Send message">
+                                                            </div>
+                                                        </div>
+                                                    </form>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="card">
+                                <div class="card-heading">
+                                    <a data-toggle="collapse" data-target="#collapseTwo">
+                                        Transaction History
+                                    </a>
+                                </div>
+                                <div id="collapseTwo" class="collapse" data-parent="#accordionExample">
+                                    <div class="card-body">
+                                        <?php foreach($transaksis as $index=>$transaksi): ?>
+                                        <p><a href="<?= site_url('invoice/'.$transaksi->id.'') ?>">Transaction <?= $transaksi->created_date ?></a></p>
+                                        <?php endforeach ?> 
+                                    </div>
+                                </div>
+                            </div> 
+                        </div> 
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Faq Section End -->
+<?= $this->endSection() ?>
+
+
+<html>
+<head>
+	<title>Invoice</title>
+<style>
+	table{
+		border-collapse: collapse;
+		width: 100%;
+	}
+	td, th {
+		border : 1px solid #000000;
+		text-align: center;
+	}
+</style>
+</head>
+<body>
+	<div style="font-size:64px; color:'#dddddd' "><i>Invoice</i></div>
+	<p>
+		<i>Toko Online</i><br>
+		Semarang, Indonesia<br>
+		024123456
+	</p>
+	<hr>
+	<hr>
+	<p></p>
+	<p>
+		Pembeli : <?= $pembeli->username ?><br>
+		Alamat : <?= $transaksi->alamat ?><br>
+		Transaksi No : <?= $transaksi->id ?><br>
+		Tanggal : <?= date('Y-m-d', strtotime($transaksi->created_date)) ?>
+	</p>
+	<table cellpadding="6" >
+		<tr>
+			<th><strong>Barang</strong></th>
+			<th><strong>Harga Satuan</strong></th>
+			<th><strong>Jumlah</strong></th>
+			<th><strong>Ongkir</strong></th>
+			<th><strong>Total Harga</strong></th>
+		</tr>
+		<tr>
+			<td><?= $barang->nama ?></td>
+			<td><?= "Rp ".number_format($barang->harga,2,',','.') ?></td>
+			<td><?= $transaksi->jumlah ?></td>
+			<td><?= "Rp ".number_format($transaksi->ongkir,2,',','.') ?></td>
+			<td><?= "Rp ".number_format($transaksi->total_harga,2,',','.') ?></td>
+		</tr>
+	</table>
+</body>
+</html>
+10.Tampilan menu transaksi dan PDF Invoice akan seperti ini
+

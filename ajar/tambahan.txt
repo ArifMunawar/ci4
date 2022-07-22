@@ -1,0 +1,186 @@
+Tambahan
+1.Untuk membuat menu terhighlight sesuai menu yang aktif, buka app/Views/components/header.php
+pada bagian paling atas tambahkan variable $uri
+<?php
+$session = session();  
+$uri = service('uri'); 
+?>
+
+sesuaikan tampilan pada menu, sehingga menjadi
+
+		<nav class="nav-menu mobile-menu">
+                    <ul> 
+                        <li <?= ($uri->getSegment(1)=='')?'class="active"':''?>><a href="<?= site_url('/') ?>">Home</a></li>
+                        <li <?= ($uri->getSegment(1)=='shop')?'class="active"':''?>><a href="<?= site_url('shop') ?>">Shop</a></li>  
+                        <li <?= ($uri->getSegment(1)=='contact')?'class="active"':''?>><a href="<?= site_url('contact') ?>">Contact</a></li>  
+                        <?php if($session->get('isLoggedIn')): ?> 
+                        <li <?= ($uri->getSegment(1)=='transaction')?'class="active"':''?>><a href="<?= site_url('transaction') ?>">Transaction</a></li>
+                        <?php endif ?>
+                    </ul>
+                </nav>
+
+
+2.Buka app/Config/Routes.php, tambahkan route untuk contact dibawah route komentar
+// We get a performance increase by specifying the default
+// route since we don't have to scan directories.
+$routes->get('/', 'Home::index');
+$routes->get('login', 'Auth::login');
+$routes->add('login', 'Auth::login');
+$routes->get('register', 'Auth::register');
+$routes->add('register', 'Auth::register');
+$routes->get('logout', 'Auth::logout');
+$routes->get('shop', 'Shop::index');
+$routes->get('shop/category/(:segment)', 'Shop::category/$1');
+$routes->get('shop/product/(:segment)', 'Shop::product/$1');
+$routes->get('shop/getcity', 'Shop::getcity');
+$routes->get('shop/getcost', 'Shop::getcost');
+$routes->get('transaction', 'Transaksi::index', ['filter' => 'auth']);
+$routes->get('invoice/(:segment)', 'Transaksi::invoice', ['filter' => 'auth']);
+$routes->add('buy', 'Transaksi::buy', ['filter' => 'auth']);
+$routes->add('komentar/create', 'Komentar::create');
+$routes->add('contact', 'Home::contact');
+
+3.Buka app/Controller/Home.php, tambahkan fungsi untuk contact
+public function contact()
+    {
+        return view('contact');
+    }
+
+4.Buat file baru bernama "contact.php" di dalam folder Views. Isi dari file ini mengacu pada file "contact.html" pada template.
+<?= $this->extend('layout') ?>
+<?= $this->section('content') ?>
+<!-- Breadcrumb Section Begin -->
+    <div class="breacrumb-section">
+        <div class="container">
+            <div class="row">
+                <div class="col-lg-12">
+                    <div class="breadcrumb-text">
+                        <a href="#"><i class="fa fa-home"></i> Home</a>
+                        <span>Contact</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Breadcrumb Section Begin -->
+
+    <!-- Map Section Begin -->
+    <div class="map spad">
+        <div class="container">
+            <div class="map-inner">
+                <iframe
+                    src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d48158.305462977965!2d-74.13283844036356!3d41.02757295168286!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x89c2e440473470d7%3A0xcaf503ca2ee57958!2sSaddle%20River%2C%20NJ%2007458%2C%20USA!5e0!3m2!1sen!2sbd!4v1575917275626!5m2!1sen!2sbd"
+                    height="610" style="border:0" allowfullscreen="">
+                </iframe>
+                <div class="icon">
+                    <i class="fa fa-map-marker"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Map Section Begin -->
+
+    <!-- Contact Section Begin -->
+    <section class="contact-section spad">
+        <div class="container">
+            <div class="row">
+                <div class="col-lg-5">
+                    <div class="contact-title">
+                        <h4>Contacts Us</h4>
+                        <p>Contrary to popular belief, Lorem Ipsum is simply random text. It has roots in a piece of
+                            classical Latin literature from 45 BC, maki years old.</p>
+                    </div>
+                    <div class="contact-widget">
+                        <div class="cw-item">
+                            <div class="ci-icon">
+                                <i class="ti-location-pin"></i>
+                            </div>
+                            <div class="ci-text">
+                                <span>Address:</span>
+                                <p>60-49 Road 11378 New York</p>
+                            </div>
+                        </div>
+                        <div class="cw-item">
+                            <div class="ci-icon">
+                                <i class="ti-mobile"></i>
+                            </div>
+                            <div class="ci-text">
+                                <span>Phone:</span>
+                                <p>+65 11.188.888</p>
+                            </div>
+                        </div>
+                        <div class="cw-item">
+                            <div class="ci-icon">
+                                <i class="ti-email"></i>
+                            </div>
+                            <div class="ci-text">
+                                <span>Email:</span>
+                                <p>hellocolorlib@gmail.com</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-6 offset-lg-1">
+                    <div class="contact-form">
+                        <div class="leave-comment">
+                            <h4>Leave A Comment</h4>
+                            <p>Our staff will call back later and answer your questions.</p>
+                            <form action="#" class="comment-form">
+                                <div class="row">
+                                    <div class="col-lg-6">
+                                        <input type="text" placeholder="Your name">
+                                    </div>
+                                    <div class="col-lg-6">
+                                        <input type="text" placeholder="Your email">
+                                    </div>
+                                    <div class="col-lg-12">
+                                        <textarea placeholder="Your message"></textarea>
+                                        <button type="submit" class="site-btn">Send message</button>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+    <!-- Contact Section End -->
+	<?= $this->endSection() ?>
+
+5.Cara mengganti titik lokasi peta.
+Buka Google Maps dan cari titik lokasi yang dikehendaki, sebagai contoh akan digunakan titik lokasi UDINUS.
+
+Pilih "bagikan" lalu "sematkan peta". Copy isi dari "src" nya saja lalu ganti src yang ada di halaman contact yang barusan dibuat tadi.
+src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3960.2260776113408!2d110.40701211472657!3d-6.982626370318607!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x2e708b4ec52229d7%3A0xc791d6abc9236c7!2sUniversitas%20Dian%20Nuswantoro!5e0!3m2!1sid!2sid!4v1656215181630!5m2!1sid!2sid"
+
+
+6.Cara menampilkan video dari Youtube.
+Cari video yang dikehendaki di Youtube lalu pilih "bagikan" lalu "sematkan", copy script iframe di kolom yang tersedia.
+
+
+Lalu paste di lokasi yang diinginkan, misalnya ditambahkan diatas tulisan "Leave a Comment"
+		<div class="col-lg-6 offset-lg-1">
+                    <iframe width="560" height="315" src="https://www.youtube.com/embed/c1O0sdApUq8" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+                    <div class="contact-form">
+                        <div class="leave-comment">
+                            <h4>Leave A Comment</h4>
+                            <p>Our staff will call back later and answer your questions.</p>
+                            <form action="#" class="comment-form">
+                                <div class="row">
+                                    <div class="col-lg-6">
+                                        <input type="text" placeholder="Your name">
+                                    </div>
+                                    <div class="col-lg-6">
+                                        <input type="text" placeholder="Your email">
+                                    </div>
+                                    <div class="col-lg-12">
+                                        <textarea placeholder="Your message"></textarea>
+                                        <button type="submit" class="site-btn">Send message</button>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
